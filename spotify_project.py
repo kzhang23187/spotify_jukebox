@@ -14,6 +14,7 @@ from mfrc522 import MFRC522
 import signal
 
 continue_reading = True
+last_read = ""
 
 #Capture SIGINT for cleanup when script is aborted
 def end_read(signal, frame):
@@ -73,9 +74,9 @@ def play_recommendation_by_artists(sp, seed_artists, device_id):
     
 def like_song(sp, device_id):
     current_song = sp.currently_playing()
-    print(current_song)
-
-    #sp.playlist_add_items("spotify:playlist:1l70hdljjU66G05HsU8cmV", 
+    song = current_song['item']['uri']
+    sp.playlist_add_items("spotify:playlist:1l70hdljjU66G05HsU8cmV", [song])
+    print("liked song")
 
 def get_device(sp, target_device):
     data = sp.devices()
@@ -86,9 +87,17 @@ def get_device(sp, target_device):
     return None
 
 def handle_data(sp, device_id, text):
+    global last_read
+    if (text == last_read):
+        return
+    last_read = text
+
     if text == "Stop":
-        "Stopping jukebox"
-        end_read()
+        print("Stopping jukebox")
+        global continue_reading
+        continue_reading = False
+        GPIO.cleanup()
+        return
     elif text == "like":
         like_song(sp, device_id)
         return
@@ -176,7 +185,6 @@ def main():
 if __name__ == '__main__':
     main()
     #TODO: Handle network loss somehow
->>>>>>> 08a0aea98ecbf7909533083ab92f34a58b16ad8c
 
 #create systemd service: https://www.raspberrypi-spy.co.uk/2015/10/how-to-autorun-a-python-script-on-boot-using-systemd/
     #Add the spotify client id and secret as Environment= in the .service file
