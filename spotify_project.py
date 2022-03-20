@@ -24,7 +24,6 @@ def end_read(signal, frame):
     
 signal.signal(signal.SIGINT, end_read)
 
-    
 def create_spotify():
     auth_manager = SpotifyOAuth(
         client_id = os.environ['SPOTIFY_CLIENT_ID'],
@@ -107,7 +106,7 @@ def handle_data(sp, device_id, text):
     
 
 def main():
-    #reader = MFRC522()
+    reader = MFRC522()
     scopes = 'user-read-playback-state user-library-read playlist-modify-public user-modify-playback-state'
     auth, sp = create_spotify()
 
@@ -130,7 +129,7 @@ def main():
     target_device = "Echo Dot"
     device_id = get_device(sp, target_device)
     print(device_id)
-    return
+
     print("Starting jukebox")
     reader = MFRC522()
 
@@ -176,6 +175,8 @@ def main():
 
 if __name__ == '__main__':
     main()
+    #TODO: Handle network loss somehow
+>>>>>>> 08a0aea98ecbf7909533083ab92f34a58b16ad8c
 
 #create systemd service: https://www.raspberrypi-spy.co.uk/2015/10/how-to-autorun-a-python-script-on-boot-using-systemd/
     #Add the spotify client id and secret as Environment= in the .service file
