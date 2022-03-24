@@ -8,6 +8,7 @@ import spotipy.util as util
 from spotipy.oauth2 import SpotifyOAuth
 import sys
 import os
+import random
 
 import RPi.GPIO as GPIO
 from mfrc522 import MFRC522
@@ -43,12 +44,23 @@ def refresh_spotify(auth_manager, spotify):
         auth_manager, spotify = create_spotify()
     return auth_manager, spotify
 
-def play_album(sp, album_uri, device_id):
-    sp.start_playback(device_id=device_id, context_uri=album_uri, offset={"position": 0},  position_ms=0)
-    try:
-        sp.shuffle(False, device_id=device_id)
-    except:
-        return
+def play_from_context(sp, uri, uriType, device_id):
+    if uriType == "album":
+        try:
+            sp.start_playback(device_id=device_id, context_uri=uri, offset={"position": 1},  position_ms=0)
+            sp.shuffle(False, device_id=device_id)
+            sp.repeat('context', device_id=device_id)
+        except:
+            return
+    elif uriType == "playlist":
+        data = sp.playlist_tracks(playlist_id=uri)
+        num_items = len(data['items'])
+        sp.start_playback(device_id=device_id, context_uri=uri, offset={"position": random.randint(0,num_items-1)},  position_ms=0)
+        try:
+            sp.shuffle(True, device_id=device_id)
+            sp.repeat('context', device_id=device_id)
+        except:
+            return
 
 def play_song(sp, song_uri):
     sp.add_to_queue(song_uri)
@@ -78,6 +90,8 @@ def like_song(sp, device_id):
     sp.playlist_add_items("spotify:playlist:1l70hdljjU66G05HsU8cmV", [song])
     print("liked song")
 
+
+
 def get_device(sp, target_device):
     data = sp.devices()
     devices = data['devices']
@@ -97,21 +111,25 @@ def handle_data(sp, device_id, text):
         global continue_reading
         continue_reading = False
         GPIO.cleanup()
-        return
     elif text == "like":
         like_song(sp, device_id)
-        return
-
-    uri = text.strip()
-    tokens = text.split(':')
-    uriType = tokens[1]
-    try:
-        if (uriType == "album"):
-            play_album(sp, uri, device_id)
-        elif (uriType == "artist"):
-            play_recommendation_by_artists(sp, [uri], device_id)
-    except:
-        print("API failed")
+    elif text == "play":
+        sp.start_playback(device_id=device_id)
+    elif text == "pause":
+        sp.pause_playback(device_id=device_id)
+    else:
+        uri = text.strip()
+        tokens = text.split(':')
+        uriType = tokens[1]
+        try:
+            if (uriType == "album" or uriType == "playlist"):
+                play_from_context(sp, uri, uriType, device_id)
+            elif (uriType == "artist"):
+                play_recommendation_by_artists(sp, [uri], device_id)
+        except Exception as e:
+            print(e)
+            last_read = ""
+            print("API failed")
     
 
 def main():
@@ -158,6 +176,8 @@ def main():
                 data = []
                 text_read = ''
                 #[6,7,8,9,10,11,12]
+                #NTAG215 organizes data so that when you read a block address it returns 4 blocks starting from that address
+                #Trial and error got me to 6, 10, 14 as the blocks to read to get the data stored on the tag (hacky but it works)
                 for block_num in [6,10,14]:
                     block = reader.MFRC522_Read(block_num) 
                     if block:
@@ -178,7 +198,7 @@ def main():
 
             else:
                 print("Scan error")
-        time.sleep(3)
+        time.sleep(1)
 
  
 
@@ -189,7 +209,9 @@ if __name__ == '__main__':
 #create systemd service: https://www.raspberrypi-spy.co.uk/2015/10/how-to-autorun-a-python-script-on-boot-using-systemd/
     #Add the spotify client id and secret as Environment= in the .service file
     #set WorkingDirectory=/path/to/pythonscript
+    #set Reset=always
 #Add export SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET to /env/profile so that spotify env variables are there after boot
+#Setup for RC522 reader https://www.youtube.com/watch?v=Q99N0AdifgY
 
 
 
